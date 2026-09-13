@@ -43,7 +43,7 @@ class Game {
     initStockfish() {
         this.wasmSupported = typeof WebAssembly === 'object' && WebAssembly.validate(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
         // this.stockfish = new Worker(this.wasmSupported ? '../stockfish/stockfish.wasm.js' : '../stockfish/stockfish.js');
-        this.stockfish = new Worker(this.wasmSupported ? 'https://luk4w.github.io/ChessJavaScript/stockfish/stockfish.wasm.js' : 'https://luk4w.github.io/ChessJavaScript/stockfish/stockfish.js');
+        this.stockfish = new Worker(this.wasmSupported ? 'https://luk4w.github.io/bitdrez/stockfish/stockfish.wasm.js' : 'https://luk4w.github.io/bitdrez/stockfish/stockfish.js');
         
         // Adiciona o listener ao stockfish
         this.stockfish.addEventListener('message', (e) => {
