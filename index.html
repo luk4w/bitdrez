@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Luk4w - Chess Java Script</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="./favicon.ico" type="image/x-icon">
@@ -12,29 +12,40 @@
 <body>
     <main>
         <section class="board-section">
-            <table id="chessboard"></table>
+            <canvas id="board-canvas"></canvas>
+
+            <section id="end" class="end-section hud-field">
+                <label id="end-game-message">Check Mate! Black Wins.</label>
+                <button id="restart-button">RESTART</button>
+            </section>
         </section>
 
-        <section id="end" class="end-section">
-            <label id="end-game-message">Check Mate! Black Wins.</label>
-            <button id="restart-button">Restart Game</button>
-        </section>
+        <aside class="side-panel">
+            <header class="hud-status">
+                <span id="hud-turn" class="hud-turn white">WHITE TO MOVE</span>
+                <span id="hud-check" class="hud-check"></span>
+            </header>
 
-        <section class="fen-section">
-            <label for="fen">FEN</label>
-            <input id="fen" type="text" value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">
-        </section>
+            <section class="fen-section">
+                <label for="fen" class="hud-label">FEN</label>
+                <div class="hud-field">
+                    <textarea id="fen" rows="2" spellcheck="false">rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1</textarea>
+                </div>
+            </section>
 
-        <section class="pgn-section">
-            <label for="pgn">PGN</label>
-            <textarea id="pgn" type="text" value=""></textarea>
-        </section>
+            <section class="pgn-section">
+                <label for="pgn" class="hud-label">PGN</label>
+                <div class="hud-field hud-pgn">
+                    <ol id="pgn-moves" class="pgn-moves"></ol>
+                    <textarea id="pgn" spellcheck="false" placeholder="paste a PGN and press IMPORT" hidden></textarea>
+                </div>
+            </section>
 
-        <section class="import-pgn-section">
-            <label id="import-error"></label>
-            <button id="import-pgn-button">IMPORT PGN</button>
-        </section>
-
+            <section class="import-pgn-section">
+                <label id="import-error"></label>
+                <button id="import-pgn-button">IMPORT</button>
+            </section>
+        </aside>
     </main>
     <script type="module" src="src/chess.js"></script>
 </body>

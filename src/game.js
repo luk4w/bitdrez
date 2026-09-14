@@ -42,8 +42,8 @@ class Game {
 
     initStockfish() {
         this.wasmSupported = typeof WebAssembly === 'object' && WebAssembly.validate(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
-        // this.stockfish = new Worker(this.wasmSupported ? '../stockfish/stockfish.wasm.js' : '../stockfish/stockfish.js');
-        this.stockfish = new Worker(this.wasmSupported ? 'https://luk4w.github.io/bitdrez/stockfish/stockfish.wasm.js' : 'https://luk4w.github.io/bitdrez/stockfish/stockfish.js');
+        this.stockfish = new Worker(this.wasmSupported ? './stockfish/stockfish.wasm.js' : './stockfish/stockfish.js');
+        // this.stockfish = new Worker(this.wasmSupported ? 'https://luk4w.github.io/bitdrez/stockfish/stockfish.wasm.js' : 'https://luk4w.github.io/bitdrez/stockfish/stockfish.js');
         
         // Adiciona o listener ao stockfish
         this.stockfish.addEventListener('message', (e) => {
@@ -299,21 +299,9 @@ class Game {
         }
     }
 
-    // Evento de clique com o botão direito do mouse
-    handleRightClick(event) {
-        event.preventDefault(); // Previne a abertura do menu de contexto padrão do navegador
-        // Alterna a classe de pré-visualização
-        event.currentTarget.classList.toggle('preview');
-        // DEBUG
-        // console.log(event.currentTarget.dataset.index);
-    }
-
     promotionPawn(board) {
         // Informa que está ocorrendo uma promoção de peão
         this.isPromotion = true;
-        // Elementos do tabuleiro
-        const boardElement = document.getElementById("chessboard");
-        const squares = boardElement.getElementsByTagName("td");
         const TO_MASK = 1n << BigInt(board.toPosition);
         const FROM_MASK = 1n << BigInt(board.fromPosition);
         const color = board.selectedColor;
@@ -400,54 +388,17 @@ class Game {
             return;
         }
 
-        // Remove os efeitos visuais e adiciona esmaecimento a todos os quadrados
-        const handlePromotionClick = (event) => this.handlePromotionClickHandler(event, board);
-        for (let square of squares) {
-            square.classList.remove("available", "selected");
-            square.classList.add("dimmed");
-            // Adiciona o evento de clique a todos os quadrados
-            square.addEventListener("click", handlePromotionClick);
-        }
-
-        // Determina as posições das peças que aparecerão para a promoção (em relação ao bitboard)
-        const promotionPositions = color === WHITE
-            ? [board.toPosition, board.toPosition - 8, board.toPosition - 16, board.toPosition - 24]
-            : [board.toPosition, board.toPosition + 8, board.toPosition + 16, board.toPosition + 24];
-
-        // Função de evento de clique para a promoção
-        this.handlePromotionClickHandler = function (event, board) {
-            const index = parseInt(event.currentTarget.dataset.index);
-
-            // Verifica se a peça selecionada está entre as posições de promoção
-            if (promotionPositions.includes(index)) {
-                const rank = Math.floor(index / 8);
-                switch (rank) {
-                    case 0:
-                    case 7:
-                        board.promotionPiece = QUEEN;
-                        break;
-                    case 1:
-                    case 6:
-                        board.promotionPiece = KNIGHT;
-                        break;
-                    case 2:
-                    case 5:
-                        board.promotionPiece = ROOK;
-                        break;
-                    case 3:
-                    case 4:
-                        board.promotionPiece = BISHOP;
-                        break;
-                }
+        // Escolha da peça no tabuleiro
+        this.renderer.showPromotion(board, (piece) => {
+            if (piece !== null) {
+                board.promotionPiece = piece;
                 promote(board);
                 board.lastMoveMask = FROM_MASK | TO_MASK;
             } else {
-                // Restaura o peão se a promoção não for válida
-                board.bitboards[board.selectedColor][PAWN] |= FROM_MASK;
-                board.bitboards[board.selectedColor][PAWN] &= ~TO_MASK;
-                if (isCapture) {
-                    board.bitboards[board.selectedColor][opponentPiece] |= TO_MASK;
-                }
+                // Restaura o peão se a promoção for cancelada
+                board.bitboards[color][PAWN] |= FROM_MASK;
+                board.bitboards[color][PAWN] &= ~TO_MASK;
+                board.halfMoves--;
             }
             board.fromPosition = null;
             board.selectedColor = null;
@@ -459,38 +410,7 @@ class Game {
             // Atualiza o tabuleiro com a peça promovida
             this.isPromotion = false;
             this.renderer.renderBoard(board);
-        };
-
-        // Adiciona as peças de promoção e destaca os quadrados
-        for (let i in promotionPositions) {
-            const indexHTML = 63 - promotionPositions[i];
-            const square = squares[indexHTML];
-            this.renderer.addPieceToBoard(promotionPositions[i], this.getPromotionPiece(indexHTML), board.selectedColor);
-            square.classList.remove("dimmed");
-            square.classList.add("promotion");
-            square.dataset.index = promotionPositions[i];
-        }
-    }
-
-
-    getPromotionPiece(index) {
-        let rank = Math.floor(index / 8);
-        switch (rank) {
-            case 0:
-            case 7:
-                return QUEEN;
-            case 1:
-            case 6:
-                return KNIGHT;
-            case 2:
-            case 5:
-                return ROOK;
-            case 3:
-            case 4:
-                return BISHOP;
-            default:
-                return null;
-        }
+        });
     }
 
     // Função para selecionar e mover a peça
@@ -555,17 +475,9 @@ class Game {
         }
     }
 
-    // Função para lidar com o clique no quadrado da tabela
-    handleOnMoveClick(event, board) {
-        // Obtem o indice do quadrado clicado
-        const index = parseInt(event.currentTarget.dataset.index);
-        // Verificações que antecedem o movimento
-        this.onMove(board, index);
-    }
-
     restart(board) {
         board.init();
-        this.renderer.renderBoard(board);
+        this.renderer.reset(board);
         this.renderer.updateFEN(board);
         this.renderer.updatePGN(board);
 
@@ -583,7 +495,13 @@ class Game {
 
         // Verifica se é promoção
         if (sanMove.includes("=")) {
-            board.promotionPiece = PIECES_SAN.indexOf(sanMove.charAt(sanMove.length - 1));
+            // A peça vem logo após o "=" (o lance pode terminar com + ou #)
+            const promotionMatch = sanMove.match(/=([NBRQ])/i);
+            if (!promotionMatch) {
+                board.invalidMove = sanMove;
+                return;
+            }
+            board.promotionPiece = PIECES_SAN.indexOf(promotionMatch[1].toUpperCase());
         }
         // Roque curto ou longo
         if (formattedMove === "O-O" || formattedMove === "O-O-O") {
@@ -636,21 +554,21 @@ class Game {
             let fromFile = null;
             if (/[1-8]/.test(formattedMove.charAt(0))) fromRank = formattedMove.charAt(0);
             else if (/[a-h]/.test(formattedMove.charAt(0))) fromFile = formattedMove.charAt(0);
+            board.toPosition = FILES.indexOf(toFile) + RANKS.indexOf(toRank) * 8;
             // Bitboard da peça selecionada
             let bitboard = board.bitboards[board.turn][board.selectedPiece];
             // Percorrer apenas a coluna ou linha do bitboard da peça selecionada
             for (let i = 0; i < 64; i++) {
                 if (bitboard & (1n << BigInt(i))) {
-                    if (fromRank && RANKS[Math.floor(i / 8)] === fromRank) {
-                        board.fromPosition = i;
-                        break;
-                    } else if (fromFile && FILES[i % 8] === fromFile) {
+                    const isOrigin = (fromRank && RANKS[Math.floor(i / 8)] === fromRank) || (fromFile && FILES[i % 8] === fromFile);
+                    // A peça precisa alcançar o destino (ex.: gxf6 com peões em g2 e g5)
+                    const moveMask = board.getPieceMovesMask(i, board.selectedPiece, board.turn, board.bitboards, board.enPassant);
+                    if (isOrigin && moveMask & (1n << BigInt(board.toPosition))) {
                         board.fromPosition = i;
                         break;
                     }
                 }
             }
-            board.toPosition = FILES.indexOf(toFile) + RANKS.indexOf(toRank) * 8;
         }
         if (board.fromPosition === null || board.toPosition === null || board.fromPosition < 0 || board.toPosition < 0
             || board.fromPosition === undefined || board.toPosition === undefined) {
@@ -774,7 +692,7 @@ class Game {
     importFEN(fen, game) {
         // Verifica se a FEN contempla todas as partes
         if (fen.split(' ').length !== 6) {
-            showError('Invalid FEN length');
+            this.renderer.showError('Invalid FEN length');
             return;
         }
         // Dicionário de peças
@@ -787,14 +705,14 @@ class Game {
         for (const rank of position.split('/')) {
             // Valida a formatação da FEN
             if (!rank.match(/^[1-8KQRBNPkqrbnp]+$/)) {
-                showError('Invalid FEN format');
+                this.renderer.showError('Invalid FEN format');
                 return;
             }
             whiteKing += (rank.match(/K/g) || []).length;
             blackKing += (rank.match(/k/g) || []).length;
         }
         if (whiteKing !== 1 || blackKing !== 1) {
-            showError('Invalid FEN kings');
+            this.renderer.showError('Invalid FEN kings');
             return;
         }
         // Limpa o tabuleiro
@@ -830,8 +748,9 @@ class Game {
         }
         // En passant
         if (enPassant !== '-') {
-            let enPassantCapture = getIndexFromMove(enPassant);
-            game.enPassant = game.turn === WHITE ? enPassantCapture + 8 : game.enPassant = enPassantCapture - 8;
+            // Casa de captura en passant no índice do bitboard; o peão capturável fica uma fileira antes dela
+            let enPassantCapture = "hgfedcba".indexOf(enPassant.charAt(0)) + (parseInt(enPassant.charAt(1), 10) - 1) * 8;
+            game.enPassant = game.turn === WHITE ? enPassantCapture - 8 : enPassantCapture + 8;
         } else {
             game.enPassant = null;
         }
@@ -861,6 +780,8 @@ class Game {
             }
         }
         game.metadata.fen = fen;
+        game.fen = fen;
+        game.kingCheckMask = game.isKingInCheck(game.bitboards, game.turn);
         game.lastMoveMask = 0n;
         game.availableMoves = 0n;
         game.metadata.moves = [];
