@@ -8,23 +8,21 @@ import { WHITE } from './constants/colors.js';
 import Notation from "./notation.js";
 
 let FONT_SIZE = 0;                // calculada para o tabuleiro caber no espaço disponível
-const LIGHT_ALPHA = 0.8;          // letras das casas claras
+const LIGHT_ALPHA = 0.65;         // letras das casas claras
 const DARK_ALPHA = 0.2;           // letras das casas escuras
 const HOLE_FRACTION = 0.6;        // fração do tabuleiro que as peças arrancam no início
 const PAD = 1.05;                 // pad em volta da peça, em alturas de linha
 const SQUEEZE_SCALE = 0.6;        // tamanho da letra quando espremida
 const SQUEEZE_SPEED = 10;
-const FILL_CHAR = '';             // caractere do miolo das peças ('' = as letras arrancadas do tabuleiro)
-const FILL_ALPHA = 1;             // opacidade do miolo (menor que 1 = contorno em destaque)
-const OUTLINE = false;            // true = contorno com os caracteres da arte; false = peça inteira de letras
+const SHADE = '@#%&$*+=~-:.';      // miolo das peças, do lado da luz para o da sombra
 const BOARD_COL_STEP = 2;         // uma letra do tabuleiro a cada N colunas (maior = menos denso)
 const BURST_TIME = 0.7;           // segundos que as letras da peça capturada levam para estourar e sumir
 const BURST_SPEED = 35;           // velocidade máxima do estouro, em alturas de linha por segundo
 const BURST_DRAG = 4.5;           // freio do estouro (maior = fica mais perto da casa)
 const NO_LETTER = 255;
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz0123456789{}[]()<>/\\|=+-*:;.,~^_#$%&';
-const COLORS = ['#00e5ff', '#ff2bd6', '#6f7d99', '#ffffff', '#ffe14d']; // brancas (neon ciano), pretas (neon magenta), tabuleiro (cinza-azul), flash da captura, último lance (amarelo)
-const GLOW = [true, true, false, false, true];
+const COLORS = ['#00e5ff', '#ff2bd6', '#c9d6f2', '#ffffff', '#ffe14d']; // brancas (neon ciano), pretas (neon magenta), tabuleiro (branco-azulado neon), flash da captura, último lance (amarelo)
+const GLOW = [0.7, 0.7, 0.12, 0, 0.5];
 const CHECK_COLOR = '#ff2a2a';
 const BOARD_ROW = 2;
 const FLASH_ROW = 3;
@@ -45,66 +43,50 @@ const SHAKE_AMP = 0.35;           // força do tremor, em alturas de linha
 // cada caractere que não é espaço vira um caractere da peça.
 const ART = Object.fromEntries(Object.entries({
     P: String.raw`
-      ___
-     (   )
-      ) (
-     /   \
-   /_______\
- (___________)`,
+    _
+   ( )
+   ) (
+  /   \
+ (_____)`,
     R: String.raw`
-  [_]_[_]_[_]
-  \_________/
-   |       |
-   |  [ ]  |
-   |       |
-   |_______|
-  /_________\
- (___________)`,
+ [_]_[_]
+  |   |
+  |   |
+ /_____\
+(_______)`,
     N: String.raw`
-      ,/|
-    _/  '.
-   / o    \
-  (__/     |
-     /     |
-    /      |
-   |_______|
-  /_________\
- (___________)`,
+   /\/\
+  / @  }
+ (_,-. }
+    /  }
+   |___}
+ /_____\
+(_______)`,
     B: String.raw`
-       o
-      / \
-     / / \
-    ( /   )
-     \___/
-      | |
-     /   \
-    |_____|
-  /_________\
- (___________)`,
+    o
+   / \
+  ( / )
+   \_/
+   | |
+ /_____\
+(_______)`,
     Q: String.raw`
-       o
-  o.  /^\  .o
-   \'/   \'/
-    \_____/
-     \___/
-      | |
-     /   \
-    (     )
-   |_______|
-  /_________\
- (___________)`,
+ o. o .o
+  \/^\/
+   \_/
+   | |
+  /   \
+ /_____\
+(_______)`,
     K: String.raw`
-      _|_
-       |
-   _.-'^'-._
-  (    |    )
-   \   |   /
-    \_____/
-     |   |
-    /     \
-   |_______|
-  /_________\
- (___________)`,
+   _|_
+  .-'-.
+ (  |  )
+  \___/
+   | |
+  /   \
+ /_____\
+(_______)`,
 }).map(([t, s]) => [t, s.split('\n').filter(line => line.trim())]));
 const ART_W = Math.max(...Object.values(ART).flat().map(line => line.trimEnd().length));
 const ART_H = Math.max(...Object.values(ART).map(lines => lines.length));
@@ -121,7 +103,7 @@ const boardCtx = boardCanvas.getContext('2d');
 const squeezeCanvas = document.createElement('canvas'); // letras espremidas que já pararam
 const squeezeCtx = squeezeCanvas.getContext('2d');
 
-const CHARS = [...new Set(LETTERS + FILL_CHAR + Object.values(ART).flat().join('').replace(/ /g, ''))];
+const CHARS = [...new Set(LETTERS + SHADE + Object.values(ART).flat().join('').replace(/ /g, ''))];
 const charIdx = Object.fromEntries(CHARS.map((c, i) => [c, i]));
 const randomChar = () => charIdx[LETTERS[(Math.random() * LETTERS.length) | 0]];
 const monoFont = size => `${size}px ui-monospace, Consolas, monospace`;
@@ -215,8 +197,11 @@ function makeAtlas(size) {
     COLORS.forEach((color, row) => {
         a.fillStyle = color;
         a.shadowColor = color;
-        a.shadowBlur = GLOW[row] ? size * 0.5 : 0;
-        CHARS.forEach((c, i) => a.fillText(c, i * cw + cw / 2, row * ch + ch / 2));
+        a.shadowBlur = size * GLOW[row];
+        // peças desenhadas 3x por cima: neon mais aceso
+        for (let pass = row < 2 ? 3 : 1; pass > 0; pass--) {
+            CHARS.forEach((c, i) => a.fillText(c, i * cw + cw / 2, row * ch + ch / 2));
+        }
     });
     return { canvas: atlasCanvas, cw, ch };
 }
@@ -229,20 +214,21 @@ function drawGlyph(g, ci, colorRow, cx, cy, scale = 1) {
 }
 
 // Máscara da peça: cada caractere da arte, centrado na casa e apoiado na base dela.
-// Espaço com contorno à esquerda, à direita, acima e abaixo é miolo e vira recheio.
-// ch = -1: o recheio usa a letra que a partícula arrancou do tabuleiro.
+// Pontas de cada fileira são o contorno; o meio (espaços e '_') vira miolo sombreado,
+// com a luz batendo a 20% da esquerda.
 function buildMask(lines) {
     const top = SQ_R - 1 - lines.length, left = Math.floor((SQ_C - ART_W) / 2);
-    const solid = (row, col) => ((lines[row] || '')[col] || ' ') !== ' ';
-    const any = (from, to, f) => { for (let i = from; i < to; i++) if (f(i)) return true; return false; };
     const mask = [];
     lines.forEach((line, row) => {
-        for (let col = 0; col < ART_W; col++) {
-            const fill = !solid(row, col);
-            if (fill && !(any(0, col, i => solid(row, i)) && any(col + 1, ART_W, i => solid(row, i)) &&
-                any(0, row, i => solid(i, col)) && any(row + 1, lines.length, i => solid(i, col)))) continue;
-            const ch = fill || !OUTLINE ? (FILL_CHAR ? charIdx[FILL_CHAR] : -1) : charIdx[line[col]];
-            mask.push({ col: left + col, row: top + row, ch, fill });
+        const lo = line.search(/\S/), hi = line.trimEnd().length - 1;
+        for (let col = lo; col <= hi; col++) {
+            const fill = col > lo && col < hi && (line[col] === ' ' || line[col] === '_');
+            const d = Math.min(1, Math.abs((col - lo) / (hi - lo || 1) - 0.2) / 0.8);
+            mask.push({
+                col: left + col, row: top + row,
+                ch: charIdx[fill ? SHADE[Math.min(SHADE.length - 1, Math.floor(d * SHADE.length))] : line[col]],
+                alpha: fill ? 1 - 0.5 * d : 1,
+            });
         }
     });
     return mask;
@@ -291,8 +277,8 @@ function resize() {
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
 
-    // maior fonte (até 24px) em que o tabuleiro cabe; sem mínimo, para caber em tela pequena
-    FONT_SIZE = Math.min(24, Math.min(W * 0.96 / (bCols * CELL_RATIO), H * 0.96 / bRows) / 1.2);
+    // maior fonte (até 32px) em que o tabuleiro cabe; sem mínimo, para caber em tela pequena
+    FONT_SIZE = Math.min(32,Math.min(W * 0.96 / (bCols * CELL_RATIO), H * 0.96 / bRows) / 1.2);
     CH = FONT_SIZE * 1.2;
     CW = CH * CELL_RATIO;
     // fonte miúda no celular: aproveita a densidade de pixels da tela para as letras não borrarem
@@ -544,8 +530,8 @@ function recruit(piece, f, r, reuse = []) {
         for (let j = 0; j < share; j++) {
             let p = reuse.pop();
             if (p) {
-                p.ch = m.ch < 0 ? p.from : m.ch;
-                p.fill = m.fill;
+                p.ch = m.ch;
+                p.alpha = m.alpha;
                 p.mc = m.col;
                 p.mr = m.row;
                 p.lead = j === 0;
@@ -555,7 +541,7 @@ function recruit(piece, f, r, reuse = []) {
             } else {
                 p = {
                     x: 0, y: 0, vx: 0, vy: 0, hx: 0, hy: 0, hcol: 0, hrow: 0, home: -1, from: 0, lead: j === 0,
-                    ch: m.ch, fill: m.fill, mc: m.col, mr: m.row, tx: 0, ty: 0, tcol: 0, trow: 0,
+                    ch: m.ch, alpha: m.alpha, mc: m.col, mr: m.row, tx: 0, ty: 0, tcol: 0, trow: 0,
                     color: colorRow, piece, delay: Math.random() * 1.2, settled: false, burst: 0, flash: 0,
                 };
                 const home = takeCell();
@@ -576,7 +562,6 @@ function recruit(piece, f, r, reuse = []) {
                 }
                 p.hx = cellX(p.hcol);
                 p.hy = cellY(p.hrow);
-                if (p.ch < 0) p.ch = p.from;
                 p.x = p.hx;
                 p.y = p.hy;
                 particles.push(p);
@@ -896,7 +881,7 @@ function frame(now) {
                 drawGlyph(ctx, p.from, p.color, p.x, p.y);
             } else if (p.lead) {
                 const y = p.piece === selected ? p.y + (-3 + Math.sin(time * 8 + p.mc * 0.7) * 1.2) * bob : p.y;
-                ctx.globalAlpha = p.fill ? FILL_ALPHA : 1;
+                ctx.globalAlpha = p.alpha;
                 drawGlyph(ctx, p.ch, p.color, p.x, y);
             }
         }
