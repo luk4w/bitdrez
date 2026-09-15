@@ -105,6 +105,12 @@ class Board {
         if (this.isKingInCheck(this.bitboards, this.selectedColor)) {
             // movimentos possiveis para se defender do xeque
             let allDefenderMoves = this.getDefenderMovesMask(this.selectedColor);
+            // A casa do en passant só defende o rei quando é um peão capturando o peão que dá xeque
+            // (o próprio rei pode fugir para ela, se estiver livre)
+            if (this.selectedPiece !== PAWN && this.selectedPiece !== KING && this.enPassant !== null) {
+                const EN_PASSANT_SQUARE = this.selectedColor === WHITE ? this.enPassant + 8 : this.enPassant - 8;
+                allDefenderMoves &= ~(1n << BigInt(EN_PASSANT_SQUARE));
+            }
             // Verifica se a peça pode se mover para defender o rei
             if ((moves & allDefenderMoves) !== 0n) {
                 this.availableMoves = (moves & allDefenderMoves);
@@ -427,6 +433,11 @@ class Board {
         // remove a peça adversária da posição de destino
         for (let p = 0; p < 6; p++) {
             tempBitboards[OPPONENT_COLOR][p] &= ~(1n << BigInt(this.toPosition));
+        }
+        // Na captura en passant o peão capturado não está na casa de destino: remove ele também
+        const EN_PASSANT_SQUARE = this.selectedColor === WHITE ? this.enPassant + 8 : this.enPassant - 8;
+        if (this.selectedPiece === PAWN && this.enPassant !== null && this.toPosition === EN_PASSANT_SQUARE) {
+            tempBitboards[OPPONENT_COLOR][PAWN] &= ~(1n << BigInt(this.enPassant));
         }
         // Retorna verdadeiro se o rei estiver em xeque
         return this.isKingInCheck(tempBitboards, this.selectedColor);
@@ -776,6 +787,11 @@ class Board {
                                 let pawnAttackerMask = getPawnAttackerMask(i, color);
                                 if (pawnAttackerMask & attackerPositionMask) {
                                     defenderMask |= (pawnAttackerMask & attackerPositionMask);
+                                }
+                                // Captura en passant do peão que está atacando o rei: o destino é a casa atrás dele
+                                if (this.enPassant !== null && ((1n << BigInt(this.enPassant)) & attackerPositionMask)) {
+                                    const EN_PASSANT_SQUARE = color === WHITE ? this.enPassant + 8 : this.enPassant - 8;
+                                    defenderMask |= pawnMoves & (1n << BigInt(EN_PASSANT_SQUARE));
                                 }
                                 break;
                             case ROOK:

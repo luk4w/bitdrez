@@ -123,10 +123,10 @@ class Game {
                     }
                     // Obtem os peões adversários
                     const OPPONENT_PAWNS = board.selectedColor === WHITE ? board.bitboards[BLACK][PAWN] : board.bitboards[WHITE][PAWN];
-                    const CAPTURE_LEFT = board.selectedColor === WHITE ? board.fromPosition + 9 : board.fromPosition - 9;
-                    const CAPTURE_RIGHT = board.selectedColor === WHITE ? board.fromPosition + 7 : board.fromPosition - 7;
+                    // Casa de destino da captura en passant: logo atrás do peão marcado
+                    const EN_PASSANT_SQUARE = board.selectedColor === WHITE ? board.enPassant + 8 : board.enPassant - 8;
                     // Verifica se o peão foi capturado pelo movimento en passant
-                    if ((board.enPassant !== null) && (board.toPosition === CAPTURE_LEFT || board.toPosition === CAPTURE_RIGHT)
+                    if ((board.enPassant !== null) && (board.toPosition === EN_PASSANT_SQUARE)
                         && (OPPONENT_PAWNS & (1n << BigInt(board.enPassant)))) {
                         // remove o peão capturado
                         board.bitboards[OPPONENT_COLOR][PAWN] &= ~(1n << BigInt(board.enPassant));
@@ -136,8 +136,9 @@ class Game {
                     // Verifica se o peão avançou duas casas em seu primeiro movimento
                     if (Math.abs(board.fromPosition - board.toPosition) === 16) {
                         // Verifica se existe um peão adversário do lado esquerdo ou direito
-                        if ((OPPONENT_PAWNS & (1n << BigInt(board.toPosition - 1)) && board.toPosition > 24) ||
-                            (OPPONENT_PAWNS & (1n << BigInt(board.toPosition + 1)) && board.toPosition < 39)) {
+                        // Na coluna h (índice % 8 = 0) não existe casa à direita, na coluna a (índice % 8 = 7) não existe à esquerda
+                        if ((OPPONENT_PAWNS & (1n << BigInt(board.toPosition - 1)) && board.toPosition % 8 !== 0) ||
+                            (OPPONENT_PAWNS & (1n << BigInt(board.toPosition + 1)) && board.toPosition % 8 !== 7)) {
                             // marca o própio peão para ser capturado pelo movimento en passant
                             board.enPassant = board.toPosition;
                         } else {
@@ -193,6 +194,8 @@ class Game {
                     }
                     break;
             }
+            // O en passant só vale no lance seguinte ao avanço duplo
+            if (board.selectedPiece !== PAWN) board.enPassant = null;
 
             // Verifica se houve captura de peça
             if (TO_MASK & OPPONENT_PIECES) {
@@ -314,6 +317,8 @@ class Game {
             board.bitboards[color][PAWN] &= ~TO_MASK; // LINHA 340 DO ERRO AQUI <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             // Adiciona a peça promovida
             board.bitboards[color][board.promotionPiece] |= TO_MASK;
+            // A promoção também encerra o en passant do lance anterior
+            board.enPassant = null;
             // Cor da peça adversária e bitboards das peças adversárias
             const OPPONENT_COLOR = color === WHITE ? BLACK : WHITE;
             const OPPONENT_PIECES = board.bitboards[OPPONENT_COLOR][PAWN]

@@ -49,11 +49,12 @@ function getPawnMoves(from, color, bitboards, enPassant) {
         const LEFT = from + 1; 
         const RIGHT = from - 1; 
         // se a posição lateral a esquerda for igual a do peão marcado para captura en passant
-        if (LEFT === enPassant) {
+        // (na coluna a não existe casa à esquerda, na coluna h não existe à direita)
+        if (LEFT === enPassant && !((1n << BigInt(from)) & A_FILE)) {
             bitboardMoves |= CAPTURE_LEFT;
         }
         // se a posição lateral a direita for igual a do peão marcado para captura en passant
-        else if (RIGHT === enPassant) {
+        else if (RIGHT === enPassant && !((1n << BigInt(from)) & H_FILE)) {
             bitboardMoves |= CAPTURE_RIGHT;
         }
     }
